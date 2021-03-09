@@ -22,7 +22,7 @@
 	mapboxgl.accessToken = 'MAPBOX_API_KEY';
     var map = new mapboxgl.Map({
         container: 'map',
-        style: 'mapbox://styles/mapbox/streets-v11',
+        style: 'mapbox://styles/mapbox/navigation-preview-day-v4',
         center: [-85.779309,  38.127978],
         zoom: 15
     });
@@ -34,7 +34,6 @@
 
         channel.subscribe(function(message) {
             let currentDate = new Date();
-            console.log(message.data.route[0])
             let data = message.data;
             data.route.pop();
             data.route.shift();
@@ -145,7 +144,7 @@
                 map.addLayer({
                     'id': tripID,
                     'layout': {
-                        'icon-image': 'rocket-15'
+                        'icon-image': 'bus-11'
                     },
                     'type': 'symbol',
                     'source': tripID
