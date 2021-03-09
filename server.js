@@ -38,8 +38,6 @@ app.get('/auth', function (req, res) {
 });
 
 app.get('/',function(req,res){
-    console.log(path);
-    console.log("BEEP");
     res.sendFile(path.join(__dirname+'/index.html'));
 });
 
@@ -48,6 +46,4 @@ app.get('/lines',function(req,res){
     res.sendFile(path.join(__dirname+'/lines.html'));
 });
 
-app.listen(3000, function () {
-    console.log('Web server listening on port 3000');
-});
+app.listen(process.env.port || 3000);
