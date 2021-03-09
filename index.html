@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Add live realtime data</title>
+<meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+<link href="https://api.mapbox.com/mapbox-gl-js/v2.1.1/mapbox-gl.css" rel="stylesheet">
+<script src="https://api.mapbox.com/mapbox-gl-js/v2.1.1/mapbox-gl.js"></script>
+<script src="https://cdn.ably.io/lib/ably.min-1.js"></script>
+<style>
+    body { margin: 0; padding: 0; }
+    #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<script>
+    var sourcesData = {};
+    var routes = {};
+    var points = {};
+	mapboxgl.accessToken = 'MAPBOX_API_KEY';
+    var map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/streets-v11',
+        center: [-85.779309,  38.127978],
+        zoom: 15
+    });
+
+    map.on('load', function () {
+        var apiKey = 'ABLY_API_KEY',
+            realtime = new Ably.Realtime({ key: apiKey }),
+            channel = realtime.channels.get('[product:ably-transport/vehicles?rewind=20]7:67:182');
+
+        channel.subscribe(function(message) {
+            let currentDate = new Date();
+            console.log(message.data.route[0])
+            let data = message.data;
+            data.route.pop();
+            data.route.shift();
+            let tripID = data.trip_id;
+            if (!data['route'][0]) {
+                return;
+            }
+
+            for (let i=0; i < data.route.length - 1; i++) {
+                data.route[i].time = Date.parse(data.route[i].time);
+                if (currentDate > data.route[i].time) {
+                    data.route.splice(i, 1);
+                }
+            }
+
+            if (sourcesData[tripID]) {
+                for (let i=0; i < sourcesData[tripID].length - 1; i++) {
+                    // If we've got outdated info, replace it
+                    if (sourcesData[tripID][i]['time'] > data.route[0].time) {
+                        sourcesData[tripID].splice(i);
+                        break;
+                    }
+                }
+                for (let i=0; i < data.route.length - 1; i++) {
+                    sourcesData[tripID].push(data.route[i]);
+                }
+
+                // Add lines
+                // var route = routes[tripID];
+                // route.data.geometry.coordinates = [];
+                // for (let i=0; i<sourcesData[tripID].length - 1; i++) {
+                //     route.data.geometry.coordinates.push(
+                //         geoCoord(
+                //             sourcesData[tripID][i]['longitude'], 
+                //             sourcesData[tripID][i]['latitude']
+                //         )
+                //     );
+                // }
+                // routes[tripID] = route;
+                // map.getSource(tripID + 'route').setData(route.data);
+            } else {
+                sourcesData[tripID] = [];
+                sourcesData[tripID] = sourcesData[tripID].concat(data.route);
+
+
+                var point = {
+                    'type': 'FeatureCollection',
+                    'features': [{
+                            'type': 'Feature',
+                            'properties': {},
+                            'geometry': {
+                                'type': 'Point',
+                                'coordinates': []
+                            }
+                        }]
+                };
+
+                point.features[0].geometry.coordinates = 
+                        geoCoord(sourcesData[tripID][0]['longitude'], 
+                        sourcesData[tripID][0]['latitude']);
+
+                    
+
+                points[tripID] = point;
+                map.addSource(tripID, {
+                'type': 'geojson',
+                'data': point
+                });
+
+                var route = {
+                    'type': 'geojson',
+                    'data': {
+                        'type': 'Feature',
+                        'properties': {},
+                        'geometry': {
+                            'type': 'LineString',
+                            'coordinates': [
+
+                            ]
+                        }
+                    }
+                }
+
+                route.data.geometry.coordinates.push(
+                    geoCoord(sourcesData[tripID][0]['longitude'], 
+                    sourcesData[tripID][0]['latitude']));
+
+
+                routes[tripID] = route;
+
+                map.addSource(tripID + 'route', route);
+                map.addLayer({
+                    'id': tripID + 'route',
+                    'type': 'line',
+                    'source': tripID + 'route',
+                    'layout': {
+                    'line-join': 'round',
+                    'line-cap': 'round'
+                    },
+                    'paint': {
+                    'line-color': '#888',
+                    'line-width': 8
+                    }
+                });
+
+
+                // Point
+                map.addLayer({
+                    'id': tripID,
+                    'layout': {
+                        'icon-image': 'rocket-15'
+                    },
+                    'type': 'symbol',
+                    'source': tripID
+                });
+
+                setInterval(() => { updatePosition(tripID) }, 1000);
+            }
+        });
+    });
+
+async function updatePositions() {
+    for (const [key, value] of Object.entries(sourcesData)) {
+        await updatePosition(key);
+    }
+    setTimeout(updatePositions, 100);
+}
+
+function updatePosition(tripID) {
+    if (sourcesData[tripID][0] == null || sourcesData[tripID][1] == null) {
+        return;
+    }
+
+    let currentTime = new Date().getTime();
+    let startTime = new Date(sourcesData[tripID][0]['time']).getTime();
+    let endTime = new Date(sourcesData[tripID][1]['time']).getTime();
+
+    if (startTime > currentTime) {
+        return;
+    }
+    
+    if (endTime < currentTime) {
+        sourcesData[tripID].shift();
+        updatePosition(tripID);
+        return;
+    }
+
+    let timeDiff = endTime - startTime;
+    let pos0X = parseFloat(sourcesData[tripID][0]['longitude']);
+    let pos0Y = parseFloat(sourcesData[tripID][0]['latitude']);
+
+    let pos1X = parseFloat(sourcesData[tripID][1]['longitude']);
+    let pos1Y = parseFloat(sourcesData[tripID][1]['latitude']);
+
+    let timePercentBetweenPoints = (currentTime - startTime) / (timeDiff);
+
+    let newX = pos0X + (pos1X - pos0X) * timePercentBetweenPoints;
+    let newY = pos0Y + (pos1Y - pos0Y) * timePercentBetweenPoints;
+
+    points[tripID].features[0].geometry.coordinates = [newX, newY];
+
+    map.getSource(tripID).setData(points[tripID]);
+
+    // Add lines
+    // routes[tripID].data.geometry.coordinates.push([newX, newY]);
+    // map.getSource(tripID + 'route').setData(routes[tripID].data);
+}
+
+function geoCoord(x, y) {
+    return [parseFloat(x), parseFloat(y).toFixed(5)];
+}
+</script>
+
+</body>
+</html>
