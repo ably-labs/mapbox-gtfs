@@ -18,6 +18,9 @@
   },
   "homepage": "https://github.com/ably-labs/mapbox-gtfs#readme",
   "dependencies": {
+    "ably": "^1.2.6",
+    "cookie-parser": "^1.4.5",
+    "dotenv": "^8.2.0",
     "express": "^4.17.1",
     "maki": "^2.1.0"
   }

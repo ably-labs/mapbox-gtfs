@@ -59,18 +59,18 @@
                 }
 
                 // Add lines
-                // var route = routes[tripID];
-                // route.data.geometry.coordinates = [];
-                // for (let i=0; i<sourcesData[tripID].length - 1; i++) {
-                //     route.data.geometry.coordinates.push(
-                //         geoCoord(
-                //             sourcesData[tripID][i]['longitude'], 
-                //             sourcesData[tripID][i]['latitude']
-                //         )
-                //     );
-                // }
-                // routes[tripID] = route;
-                // map.getSource(tripID + 'route').setData(route.data);
+                var route = routes[tripID];
+                route.data.geometry.coordinates = [];
+                for (let i=0; i<sourcesData[tripID].length - 1; i++) {
+                    route.data.geometry.coordinates.push(
+                        geoCoord(
+                            sourcesData[tripID][i]['longitude'], 
+                            sourcesData[tripID][i]['latitude']
+                        )
+                    );
+                }
+                routes[tripID] = route;
+                map.getSource(tripID + 'route').setData(route.data);
             } else {
                 sourcesData[tripID] = [];
                 sourcesData[tripID] = sourcesData[tripID].concat(data.route);
@@ -195,8 +195,8 @@ function updatePosition(tripID) {
     map.getSource(tripID).setData(points[tripID]);
 
     // Add lines
-    // routes[tripID].data.geometry.coordinates.push([newX, newY]);
-    // map.getSource(tripID + 'route').setData(routes[tripID].data);
+    routes[tripID].data.geometry.coordinates.push([newX, newY]);
+    map.getSource(tripID + 'route').setData(routes[tripID].data);
 }
 
 function geoCoord(x, y) {
