@@ -46,4 +46,4 @@ app.get('/lines',function(req,res){
     res.sendFile(path.join(__dirname+'/lines.html'));
 });
 
-app.listen(process.env.port || 3000);
+app.listen(process.env.PORT || 3000);
